@@ -1,0 +1,18 @@
+# Bioinformatics & Data
+biopython
+pandas
+scikit-learn
+matplotlib
+seaborn
+
+# Deep Learning & Transformers
+transformers
+# Note: PyTorch with CUDA should be installed with a specific index-url on Windows.
+# We will run a separate pip install command for it.
+# torch
+# torchvision
+# torchaudio
+
+# Jupyter Environment
+jupyter
+ipykernel
