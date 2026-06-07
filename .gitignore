@@ -166,8 +166,3 @@ cython_debug/
 data/
 models/
 
-# Agent/plan documentation (local only)
-AGENTS.md
-CNN_OPTIMIZATION_PLAN.md
-GEMINI.md
-LSTM_OPTIMIZATION_PLAN.md
