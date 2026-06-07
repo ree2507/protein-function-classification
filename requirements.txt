@@ -6,7 +6,8 @@ matplotlib
 seaborn
 
 # Deep Learning & Transformers
-transformers
+transformers>=4.41.0,<4.45.0
+peft>=0.12.0,<0.13.0     # LoRA untuk fine-tuning efisien (pinned for transformers 4.41.x compat)
 # Note: PyTorch with CUDA should be installed with a specific index-url on Windows.
 # We will run a separate pip install command for it.
 # torch
@@ -16,3 +17,16 @@ transformers
 # Jupyter Environment
 jupyter
 ipykernel
+
+# Backend API
+fastapi
+uvicorn
+pydantic
+
+# Telegram Bot
+python-telegram-bot
+
+# Utilities
+httpx
+python-dotenv
+tabulate  # Untuk tabel perbandingan
