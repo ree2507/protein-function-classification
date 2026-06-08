@@ -1,32 +1,31 @@
 # Bioinformatics & Data
 biopython
-pandas
-scikit-learn
-matplotlib
-seaborn
+pandas>=1.5
+scikit-learn>=1.0
+matplotlib>=3.5
+seaborn>=0.12
+numpy>=1.23
 
 # Deep Learning & Transformers
 transformers>=4.41.0,<4.45.0
-peft>=0.12.0,<0.13.0     # LoRA untuk fine-tuning efisien (pinned for transformers 4.41.x compat)
+peft>=0.12.0,<0.13.0  # LoRA fine-tuning (pinned for transformers 4.41.x compat)
+accelerate>=1.0.0     # Required by PEFT
 # Note: PyTorch with CUDA should be installed with a specific index-url on Windows.
-# We will run a separate pip install command for it.
-# torch
-# torchvision
-# torchaudio
+# Run a separate pip install command for it:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Jupyter Environment
-jupyter
-ipykernel
+jupyter>=1.0
+ipykernel>=6.0
 
 # Backend API
-fastapi
-uvicorn
-pydantic
+fastapi>=0.100
+uvicorn>=0.20
+pydantic>=2.0
 
 # Telegram Bot
-python-telegram-bot
+python-telegram-bot>=20.0
 
 # Utilities
-httpx
-python-dotenv
-tabulate  # Untuk tabel perbandingan
+httpx>=0.24
+python-dotenv>=1.0

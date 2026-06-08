@@ -1,64 +1,18 @@
-# Laporan Comparative Analysis (Phase 5)
+# Comparative Analysis (Phase 5)
 
-## Tujuan
-Notebook `06_comparative_analysis.ipynb` yang membandingkan performa CNN v2, LSTM v5, dan ESM-2 v1 secara visual dan analitis — tanpa ensembling.
+## Iterasi
 
-## Tantangan Utama
-Per-sample predictions (`y_pred`, `y_true`, probabilities) **tidak disimpan** di file JSON — hanya metrik agregat. Notebook perlu melakukan **re-run inference** dengan memuat ulang weight model.
+Analysis dilakukan dalam satu fase penuh — tidak ada iterasi (analisis komparatif adalah fase final setelah ketiga model selesai dilatih).
 
-## Struktur Notebook
+### Tantangan Utama
+Per-sample predictions (`y_pred`, `y_true`, probabilities) **tidak disimpan** di file JSON masing-masing model — hanya metrik agregat. Notebook perlu melakukan **re-run inference** dengan memuat ulang weight ke-3 model.
 
-### Bagian 1: Setup & Load Data
-- Import libraries
-- Load test set (`data/processed/test.csv`) — 3,764 sequences
-- Load label mapping (`data/processed/label_mapping.json`)
-- Load saved metrics dari 3 JSON (`data/results/*_metrics.json`)
+### Struktur Notebook
+1. Setup & Load Data — test set (3,764 sekuen) + label mapping + saved metrics dari 3 JSON
+2. Load Model & Inference — CNN (`cnn_model.pth`, 2.5s), LSTM (`lstm_model_best.pth`, 4.1s), ESM-2 (`esm2_model_best/`, 313.2s)
+3. Output: `y_pred`, `y_prob`, `y_true` disimpan ke `data/results/comparative_predictions.npz`
 
-### Bagian 2: Load Model & Inference
-| Model | Source Weight | Waktu Aktual |
-|-------|---------------|:--------------:|
-| **CNN v2** | `models/cnn_model.pth` | **2.5 detik** |
-| **LSTM v5** | `models/lstm_model_best.pth` | **4.1 detik** |
-| **ESM-2 v1** | `models/esm2_model_best/` (LoRA) | **313.2 detik** (~5.2 menit) |
-
-Output yang disimpan:
-- `y_pred` (predicted class), `y_prob` (probabilities), `y_true` (ground truth)
-- Inference time per model
-- Simpan ke `data/results/comparative_predictions.npz`
-
-### Bagian 3: Overall Performance Comparison
-- **Bar chart** side-by-side: Accuracy, F1 Macro, MCC (3 models × 3 metrics)
-- **Radar chart** multi-metrik
-- **Confidence histogram** — distribusi max probability per model
-
-### Bagian 4: Per-Class Performance
-- **Grouped bar chart** — F1, Precision, Recall per class untuk 3 model
-- Identifikasi termudah/tersulit per model
-- Sorot **Hydrolase** sebagai kelas paling menantang
-
-### Bagian 5: Confusion Matrices
-- 3 confusion matrices dalam 1 figure (subplot 1×3)
-- Versi normalized untuk perbandingan yang adil
-
-### Bagian 6: Error Analysis
-- **Model Agreement Matrix** — heatmap seberapa sering model setuju/salah bersama
-- **Hard Sample Identification** — sampel salah oleh 2+ model
-- **Error patterns** per kelas
-
-### Bagian 7: Training Dynamics Comparison
-- Loss curves (train & val) untuk 3 model dalam 1 plot
-- Accuracy curves overlay
-- Analisis convergence speed & overfitting
-
-### Bagian 8: Trade-off Analysis
-- Scatter plot: Accuracy vs Parameter Count vs Training Time vs VRAM
-- Tabel perbandingan resource lengkap
-- Rekomendasi berdasarkan use case
-
-### Bagian 9: Kesimpulan & Rekomendasi
-- ESM-2 unggul akurasi, CNN unggul efisiensi, LSTM sebagai kompromi
-
-## Hasil Aktual
+## Hasil
 
 ### Metrik Final
 
@@ -91,7 +45,7 @@ Output yang disimpan:
 | Tidak ada yang benar | 140 | 3.7% |
 | Hard samples (salah ≥2 model) | 368 | 9.8% |
 
-### Waktu Inference (3,764 sekuen)
+### Waktu Inference (3,764 sekuen, RTX 2050)
 
 | Model | Waktu |
 |-------|:-----:|
@@ -99,23 +53,16 @@ Output yang disimpan:
 | LSTM v5 | 4.1s |
 | ESM-2 v1 | 313.2s (~5.2 menit) |
 
-## Files Generated
-
-| File | Deskripsi |
-|------|-----------|
-| `data/results/comparative_predictions.npz` | Semua prediksi + probabilitas (3 model × 3,764 samples) |
-| `figures/comparison_overall.png` | Bar chart perbandingan metrik |
-| `figures/comparison_perclass.png` | Per-class performance |
-| `figures/confusion_matrices.png` | Side-by-side confusion matrices |
-| `figures/error_analysis.png` | Error analysis visualizations |
-| `figures/training_curves.png` | Overlay training curves |
-| `figures/tradeoff.png` | Trade-off scatter plot |
-| `figures/F1_Radar_Chart.png` | Radar chart perbandingan F1 per kelas |
-| `figures/confidence_histogram.png` | Distribusi confidence per model |
-
 ## Catatan & Temuan
 
-1. **ESM-2 inference lambat di RTX 2050 4GB** (313.2s) — menggunakan batch size 8 dan FP16. Loading model saja membutuhkan beberapa menit karena ukuran checkpoint ~140MB.
-2. **Hydrolase adalah kelas tersulit** untuk semua model (CNN F1=0.61, LSTM F1=0.75, ESM-2 F1=0.87) — konsisten dengan dugaan bahwa kelas ini memiliki diversitas sekuens tertinggi.
-3. **Performa inference ESM-2 sangat konsisten** dengan saved metrics: Acc 93.09% (saved) vs 93.07% (inference) — selisih hanya 0.02%.
-4. **CNN vs LSTM gap lebih kecil** dari yang diantisipasi pada awalnya — LSTM hanya unggul ~4% dalam accuracy.
+1. **ESM-2 inference lambat di RTX 2050 4GB** (313.2s) — menggunakan batch size 8 dan FP16. Loading model membutuhkan beberapa menit karena checkpoint ~140MB.
+2. **Hydrolase adalah kelas tersulit** untuk semua model (CNN F1=0.61, LSTM F1=0.75, ESM-2 F1=0.87) — diversitas sekuens tertinggi.
+3. **Performa inference ESM-2 sangat konsisten** dengan saved metrics: selisih hanya 0.02%.
+4. **CNN vs LSTM gap lebih kecil** dari yang diantisipasi — LSTM hanya unggul ~4% accuracy.
+5. **Ketidakonsistenan loading weight:** CNN dimuat dari `cnn_model.pth` (final epoch), LSTM dari `lstm_model_best.pth` (best epoch) — dapat memengaruhi perbandingan.
+
+## Rencana Selanjutnya
+
+- Ensemble voting (CNN + LSTM + ESM-2) untuk memanfaatkan agreement 3 model
+- Analisis error lebih dalam pada hard samples (368 sampel)
+- Threshold tuning per kelas untuk meningkatkan F1 Hydrolase
