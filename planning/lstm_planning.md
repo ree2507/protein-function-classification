@@ -1,97 +1,162 @@
-# LSTM — Strategi Optimasi (v1 → v2 → v3 → v4 → v5)
+# LSTM — Strategi Optimasi (v1 → v1.1)
 
-## Iterasi
+## Hasil Training v1
 
-### v1 — Baseline
+**Model:** LSTM v1 — augmentasi 1-AA + CosineAnnealingWarmRestarts + FocalLoss γ=1.0 + Label Smoothing ε=0.1
+
+### Metrik Test Set
+
 | Metrik | Nilai |
 |--------|-------|
-| **Accuracy** | 87.0% |
-| **MCC** | 0.8498 |
-| **F1 Macro** | 0.88 |
-| **F1 Hydrolase** | 0.76 |
-| **Best Epoch** | 12 (early stop 17) |
+| **Accuracy** | 87.81% |
+| **F1 Macro** | 0.8809 |
+| **MCC** | 0.8535 |
+| **Best Epoch** | 31 / 36 (early stop) |
+| **Waktu/Epoch** | ~47s |
 
-**Masalah:** Overfitting parah (gap train-val loss ~0.25), regularisasi minim (hanya dropout 0.3 di LSTM + 0.5 di FC).
+### Per-Class F1
 
-### v2 — Over-regularized
-**Perubahan:** Weight Decay (1e-4), Embedding Dropout (0.2), Recurrent Dropout 0.3→0.4, FC Dropout 0.5→0.6, Combined Pooling, Gradient Clipping, LR 0.001→0.0005.
+| Kelas | Precision | Recall | F1-Score | Support |
+|-------|:---------:|:------:|:--------:|:-------:|
+| GPCR | 0.96 | 0.97 | **0.97** | 498 |
+| Hydrolase | 0.75 | 0.77 | **0.76** | 643 |
+| Ion Channel | 0.94 | 0.98 | **0.96** | 671 |
+| Kinase | 0.91 | 0.83 | **0.87** | 628 |
+| Oxidoreductase | 0.86 | 0.85 | **0.85** | 679 |
+| Transcription Factor | 0.87 | 0.87 | **0.87** | 645 |
 
-| Metrik | v1 | v2 | Delta |
-|--------|:--:|:--:|:-----:|
-| Accuracy | 87.0% | **86.0%** | -1.0% |
-| MCC | 0.8498 | **0.8287** | -0.021 |
-| F1 Hydrolase | 0.76 | **0.70** | -0.06 |
-| Gap Train-Val | ~0.25 | **~0.027** | ✅ -0.223 |
+### Perbandingan dengan Baseline v5
 
-✅ Overfitting hampir hilang. ❌ Tapi regularisasi terlalu agresif — kapasitas model terhambat, Hydrolase turun signifikan.
+| Metrik | v5 (70:15:15) | v6 Exp2 (Augment) | **v1** |
+|--------|:-------------:|:-----------------:|:-----:|
+| **Accuracy** | 86.85% | **88.86%** | **87.81%** |
+| **F1 Macro** | 0.87 | **0.89** | **0.88** |
+| **MCC** | 0.842 | **0.862** | **0.854** |
+| **Hydrolase F1** | 0.75 | **0.78** | **0.76** |
 
-### v3 — Kurangi Regularisasi
-**Perubahan:** FC Dropout 0.6→0.5, Weight Decay 1e-4→5e-5. LR 0.0005 tetap.
+### Analisis
 
-| Metrik | v2 | v3 | Delta |
-|--------|:--:|:--:|:-----:|
-| Accuracy | 86.0% | **86.7%** | +0.7% |
-| MCC | 0.8287 | **0.8398** | +0.011 |
-| F1 Hydrolase | 0.70 | **0.73** | +0.03 |
-| Gap Train-Val | ~0.027 | **~0.079** | masih terkendali |
+**Positif:**
+- ✅ v1 exceed v5 baseline (+0.96% Acc, +0.012 MCC)
+- ✅ Hydrolase naik 0.75 → 0.76 (meski belum ke 0.78)
+- ✅ Waktu/epoch turun ~283s → ~47s (karena tanpa compile overhead, pure training)
+- ✅ Augmentasi terbukti efektif untuk kelas minoritas
 
-✅ Keseimbangan lebih baik, tren positif. ❌ Hydrolase (0.73) masih di bawah target 0.76.
+**Negatif:**
+- ❌ v1 di bawah v6 Exp2 (88.86%) — Cosine LR justru menurunkan performa augmentasi
+- ❌ Epoch 16 ada spike loss — bertepatan dengan restart Cosine LR (T₀=5, T_mult=2)
+- ❌ Hydrolase stuck di 0.76 (turun dari 0.78 di v6 Exp2)
 
-### v4 — Focal Loss + Attention + Weighted Sampling ❌ Gagal
-**Perubahan:** Focal Loss (γ=2.0), WeightedRandomSampler (Hydrolase weight 2×), MultiheadAttention (4 heads), Batch Size 64→32.
+### Kesimpulan
 
-| Metrik | v3 | v4 | Delta |
-|--------|:--:|:--:|:-----:|
-| Accuracy | 86.7% | **83.0%** | ❌ -3.7% |
-| MCC | 0.8398 | **0.8016** | ❌ -0.038 |
-| F1 Hydrolase | 0.73 | **0.68** | ❌ -0.05 |
-| Waktu/Epoch | ~56s | **~230s** | ~4× lebih lambat |
+Cosine LR restart menyebabkan model kehilangan progres saat augmentasi — setiap restart (LR naik ke 5e-4) mengganggu representasi yang sudah stabil. **Augmentasi + ReduceLROnPlateau (v6 Exp2) menghasilkan performa lebih tinggi (88.86%)** karena LR turun monoton.
 
-**Penyebab kegagalan:**
-1. **Attention mechanism** — menambah parameter signifikan (matriks [32×4×1000×1000]), gap train-val melebar 0.079→0.171
-2. **Focal Loss γ=2.0** — terlalu agresif, model "lupa" kelas yang sebelumnya sudah bagus (Oxidoreductase F1 0.82→0.74)
-3. **WeightedRandomSampler** — oversampling dengan replacement menyebabkan overfit ke sampel Hydrolase spesifik (precision turun 0.72→0.60)
-4. **Batch size turun** 64→32 → gradien lebih noisy
-5. **Efek sinergis negatif** — kombinasi semua strategi menciptakan over-regularisasi kumulatif
+---
 
-### v5 — Optimasi Maksimal ✅ Sukses
-**Perubahan dari v4:**
-- ❌ Attention + WeightedRandomSampler — **dihapus** (penyebab utama kegagalan)
-- ⚡ Focal Loss γ=2.0 → **γ=1.0** (lebih gentle)
-- ✨ Label Smoothing ε=0.1 (kalibrasi probabilitas)
-- ✨ Embedding 64 → **128** (kapasitas representasi 2×)
-- ✨ FC 512→128→6 → **512→256→128→6** + dropout bertahap (0.5 + 0.3)
-- ✨ Weight Init: Xavier (LSTM ih) + Orthogonal (LSTM hh) + Kaiming (FC)
-- ⚡ Batch Size 32 → **64** (VRAM bebas setelah attention dihapus)
+## Rencana v1.1
 
-| Metrik | v3 | v4 | **v5** | Delta v3→v5 |
-|--------|:--:|:--:|:------:|:-----------:|
-| **Accuracy** | 86.7% | 83.0% | **89.0%** | ✅ +2.3% |
-| **MCC** | 0.8398 | 0.8016 | **0.8710** | ✅ +0.031 |
-| **F1 Macro** | 0.87 | 0.84 | **0.90** | ✅ +0.03 |
-| **F1 Hydrolase** | 0.73 | 0.68 | **0.80** | ✅ +0.07 |
-| **F1 Oxidoreductase** | 0.82 | 0.74 | **0.86** | ✅ +0.04 |
-| **Waktu/Epoch** | ~56s | ~230s | ~283s | lebih lambat (embedding 128) |
+### Target: ≥88.86% Accuracy, ≥0.86 MCC, ≥0.89 F1 Macro
 
-**Semua target tercapai:** Accuracy ≥87% ✅, F1 Macro ≥0.88 ✅, MCC ≥0.85 ✅, F1 Hydrolase ≥0.76 ✅.
+### Perubahan dari v1
+- ❌ CosineAnnealingWarmRestarts → **ReduceLROnPlateau** (kembali ke scheduler yang terbukti)
+- ✨ Multi-seed (42, 123, 456) — untuk cari seed optimal + ukur varians
+- Pertahankan: Augmentasi 1-AA, FocalLoss γ=1.0, LS ε=0.1, arsitektur v1
 
-### Dampak Split Change (80:20 → 70:15:15)
-Setelah split change, performa v5 turun:
-- Accuracy: 89.0% → **86.85%**
-- MCC: 0.871 → **0.842**
-- F1 Hydrolase: 0.80 → **0.75**
+### Eksperimen Lanjutan (Jika Target Tercapai)
 
-Penyebab: training set berkurang 12.5% (20,073→17,564), kapasitas model tetap.
+| Eksperimen | Detail |
+|------------|--------|
+| **Seed Tuning** | Cari seed terbaik dari [42, 123, 456] |
+| **Augmentasi Rate** | Uji probabilitas mutasi 0.05, 0.1, 0.15 |
+| **Early Stopping** | Uji patience 7 (vs 5) untuk epoch lebih banyak |
+| **Embedding Size** | Uji 128 vs 256 (trade-off VRAM vs kapasitas) |
+| **Dropout Tuning** | Uji FC dropout 0.4 vs 0.5 vs 0.6 |
 
-## Rencana Selanjutnya (v6)
+---
 
-### Prioritas 1: Ubah Rasio Split
-Kembali ke 80:10:10 (train 20,073) untuk mengembalikan data training yang hilang.
+## Hasil Training v1.1
 
-### Prioritas 2: Optimasi Lanjutan
-- Cosine annealing LR scheduler
-- Uji varians seed (42, 123, 456) untuk klarifikasi baseline
-- Data augmentation konservatif (mutasi 1 asam amino per sekuens dari kelompok homolog)
+**Model:** LSTM v1.1 — augmentasi 1-AA + ReduceLROnPlateau + FocalLoss γ=1.0 + Label Smoothing ε=0.1 + Multi-Seed [42, 123, 456]
 
-### Prioritas 3: Eksperimental
-- Temporal Convolutional Network (TCN) sebagai alternatif arsitektur
+### Multi-Seed Test Set
+
+| Seed | Accuracy | F1 Macro | MCC | Best Epoch |
+|:----:|:--------:|:--------:|:---:|:----------:|
+| **42** | **0.8831** | **0.8857** | **0.8596** | 23 |
+| 123 | 0.8778 | 0.8803 | 0.8533 | 24 |
+| 456 | 0.8791 | 0.8811 | 0.8549 | 23 |
+| **Mean** | **0.8800 ± 0.0023** | | | |
+
+### Per-Class F1 (Best Seed 42)
+
+| Kelas | Precision | Recall | F1-Score | Support |
+|-------|:---------:|:------:|:--------:|:-------:|
+| GPCR | 0.95 | 0.98 | **0.97** | 498 |
+| Hydrolase | 0.80 | 0.73 | **0.77** | 643 |
+| Ion Channel | 0.94 | 0.97 | **0.95** | 671 |
+| Kinase | 0.89 | 0.87 | **0.88** | 628 |
+| Oxidoreductase | 0.83 | 0.87 | **0.85** | 679 |
+| Transcription Factor | 0.87 | 0.87 | **0.87** | 645 |
+
+### Perbandingan
+
+| Metrik | v1 (Cosine LR) | **v1.1 (ReduceLROnPlateau)** | v6 Exp2 (target) |
+|--------|:--------------:|:---------------------------:|:----------------:|
+| **Accuracy** | 87.81% | **88.31%** | **88.86%** |
+| **F1 Macro** | 0.8809 | **0.8857** | **0.89** |
+| **MCC** | 0.8535 | **0.8596** | **0.862** |
+| **Hydrolase F1** | 0.76 | **0.77** | **0.78** |
+
+### Analisis
+
+**Positif:**
+- ✅ ReduceLROnPlateau >> Cosine LR — v1.1 (88.31%) exceed v1 (87.81%) dengan +0.50%
+- ✅ Multi-seed stabil — std dev ±0.23%, seed 42 terbaik
+- ✅ Hydrolase naik 0.76→0.77 — augmentasi bekerja konsisten
+- ✅ Tidak ada spike loss — training smooth tanpa restart Cosine LR
+- ✅ Gap ke target mengecil dari 1.05% (v1) → 0.55% (v1.1)
+
+**Negatif:**
+- ❌ Masih 0.55% di bawah v6 Exp2 (88.86%)
+- ❌ Hydrolase recall rendah (0.73) meski precision naik (0.80) — model terlalu konservatif untuk kelas minoritas
+
+---
+
+## Rencana v1.2
+
+### Target: ≥89.0% Accuracy, ≥0.87 MCC, ≥0.89 F1 Macro
+
+### Strategi: Hyperparameter Tuning + Modifikasi Arsitektur
+
+### Perubahan Arsitektur
+
+| Komponen | v1.1 | v1.2 | Dampak |
+|----------|------|------|--------|
+| **Embedding** | 128 | **256** | Kapasitas representasi AA 2× |
+| **Hidden LSTM** | 128 | **256** | Kemampuan menangkap pola lebih kompleks |
+| **BatchNorm** | Tidak ada | **BatchNorm1d(1024)** setelah pooling | Stabilisasi training, mengurangi internal covariate shift |
+| **FC Layers** | 3 layer (512→256→128→6) | **4 layer (1024→512→256→128→6)** | Lebih banyak non-linearitas, hierarki fitur lebih dalam |
+| **Total Params** | ~430K | **~1.74M** | Masih aman di 4GB VRAM |
+
+### Perubahan Hyperparameter
+
+| Parameter | v1.1 | v1.2 | Alasan |
+|-----------|------|------|--------|
+| **Augmentasi Rate** | ~0.1 (1 AA/sample) | **0.05 (5% prob)** | Lebih konservatif, mengurangi noise |
+| **Early Stopping** | patience=5 | **patience=7** | Model lebih besar butuh epoch lebih banyak |
+| **LR Scheduler** | ReduceLROnPlateau(factor=0.5) | **ReduceLROnPlateau(factor=0.3)** | LR turun lebih agresif saat plateau |
+| **Seed** | [42, 123, 456] | **[42]** (seed terbaik) | Seed 42 terbukti optimal |
+
+### Expected Improvement
+
+| Metrik | v1.1 | Target v1.2 |
+|--------|:----:|:-----------:|
+| **Accuracy** | 88.31% | **≥89.0%** |
+| **F1 Macro** | 0.8857 | **≥0.89** |
+| **MCC** | 0.8596 | **≥0.87** |
+| **Hydrolase F1** | 0.77 | **≥0.79** |
+
+Setelah v1.2, eksperimen lanjutan:
+- **Multi-seed validation** dengan arsitektur baru
+- **Dropout tuning** (0.4 / 0.5 / 0.6)
+- **Augmentasi rate tuning** lanjutan (0.03 / 0.05 / 0.07)

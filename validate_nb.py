@@ -1,6 +1,6 @@
 import json
 
-with open('04_lstm_v7_kaggle.ipynb', 'r', encoding='utf-8') as f:
+with open('04_lstm_model.ipynb', 'r', encoding='utf-8') as f:
     nb = json.load(f)
 
 print(f"Total cells: {len(nb['cells'])}")
