@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 API_URL = os.getenv('API_URL', 'http://localhost:8000')
-MODEL_DEFAULT = os.getenv('MODEL_DEFAULT', 'lstm')
 
 SEQ_PATTERN = re.compile(r'^[ACDEFGHIKLMNPQRSTVWYacdefghiklmnpqrstvwy]{4,1000}$')
 
@@ -30,31 +29,14 @@ CLASS_EMOJIS = {
     "Transcription Factor": "🧬"
 }
 
-MODEL_NAMES = {
-    "cnn": "CNN v2",
-    "lstm": "LSTM v5",
-    "esm2": "ESM-2 v1"
-}
-
-def build_prediction_text(result, model_key="lstm"):
-    if model_key == "all":
-        text = "🧬 *Perbandingan Semua Model*\n"
-        text += f"Panjang sekuens: {result['sequence_length']} aa\n\n"
-        for mkey, mname in [("cnn", "CNN v2"), ("lstm", "LSTM v5"), ("esm2", "ESM-2 v1")]:
-            pred = result['predictions'][mkey]
-            emoji = CLASS_EMOJIS.get(pred['class'], "🔬")
-            text += f"*{mname}:* {emoji} {pred['class']} ({pred['confidence']:.1%})\n"
-        info = result['class_info']
-        text += f"\n📖 *{info['name_full']}*\n{info['description']}"
-        return text
-
+def build_prediction_text(result):
     pred = result['prediction']
     info = result['class_info']
     emoji = CLASS_EMOJIS.get(pred['class'], "🔬")
 
     text = f"🧬 *Hasil Prediksi*\n"
     text += f"Panjang sekuens: `{result['sequence_length']} aa`\n"
-    text += f"Model: {MODEL_NAMES.get(result['model_used'], result['model_used'])}\n\n"
+    text += f"Model: LSTM v5\n\n"
 
     text += f"🔮 *Prediksi:* {emoji} `{pred['class']}` ({pred['confidence']:.1%})\n\n"
 
@@ -110,15 +92,10 @@ def build_prediction_text(result, model_key="lstm"):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        # "╔══════════════════════════════════╗\n"
-        "   🧬 *Protein Classifier Bot*    \n"
-        # "╚══════════════════════════════════╝\n\n"
+        "   🧬 *Protein Classifier Bot (LSTM)*    \n"
         "Selamat datang! Saya adalah bot untuk mengklasifikasikan\n"
-        "fungsi protein berdasarkan sekuens asam aminonya.\n\n"
-        "🔬 *Model Tersedia:*\n"
-        "• CNN (Conv1D) — 82.76% akurasi\n"
-        "• Bi-LSTM — 86.85% akurasi ✅ (default)\n"
-        "• ESM-2 — 93.09% akurasi\n\n"
+        "fungsi protein berdasarkan sekuens asam aminonya\n"
+        "menggunakan model Bi-LSTM.\n\n"
         "🧪 *6 Famili Protein:*\n"
         "0️⃣ GPCR — G Protein-Coupled Receptor\n"
         "1️⃣ Hydrolase — Enzim hidrolisis\n"
@@ -132,9 +109,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 *Daftar Perintah:*\n"
         "/start — Tampilkan pesan ini\n"
         "/help — Panduan lengkap\n"
-        "/about — Info project & akurasi\n"
-        "/compare <seq> — Bandingkan semua model\n"
-        "/model <cnn/lstm/esm2> — Ganti model default\n\n"
+        "/about — Info project\n\n"
         "⚠️ *Warning*\n"
         "Project ini masih dalam tahap pengembangan, sehingga\n"
         "informasi yang disajikan serta hasil prediksi model\n"
@@ -148,17 +123,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 *Prediksi Sekuens:*\n"
         "Kirim teks yang berisi sekuens protein\n"
         "(hanya huruf A-Z, panjang 4-1000 karakter).\n\n"
-        "🔹 *Ganti Model:*\n"
-        "Gunakan /model diikuti nama model:\n"
-        "• `/model cnn` — CNN v2 (cepat, 82.76% akurasi)\n"
-        "• `/model lstm` — LSTM v5 (sedang, 86.85% akurasi)\n"
-        "• `/model esm2` — ESM-2 (lambat, 93.09% akurasi)\n\n"
-        "🔹 *Bandingkan:*\n"
-        "`/compare MKTAYIA...` — Prediksi dari 3 model\n"
-        "sekaligus (side-by-side).\n\n"
-        "🔹 *Model Default:*\n"
-        f"Saat ini: `{MODEL_DEFAULT}`\n"
-        "Ganti dengan /model\n\n"
+        "🔹 *Model yang Digunakan:*\n"
+        "Bi-LSTM v5 — akurasi 86.85%\n\n"
         "🔹 *Batasan:*\n"
         "• Maks 1000 karakter per sekuens\n"
         "• Hanya 20 asam amino standar\n"
@@ -170,14 +136,14 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "🧬 <b>Tentang Project</b>\n\n"
         "📌 <b>Deskripsi</b>\n"
-        "Project perbandingan arsitektur deep learning untuk\n"
-        "klasifikasi fungsi protein.\n\n"
+        "Project klasifikasi fungsi protein menggunakan\n"
+        "arsitektur LSTM (Long Short-Term Memory).\n\n"
         "🎯 <b>Tujuan</b>\n"
         "Sebagai bahan pembelajaran dan edukasi mengenai\n"
         "penerapan deep learning dalam bioinformatika.\n\n"
         "💡 <b>Manfaat</b>\n"
-        "Mengenal tiga pendekatan AI (CNN, LSTM, ESM-2)\n"
-        "dalam klasifikasi fungsi protein secara langsung.\n\n"
+        "Mengenal pendekatan LSTM dalam klasifikasi\n"
+        "fungsi protein secara langsung.\n\n"
         "📊 <b>Deskripsi Dataset</b>\n"
         "• Sumber: UniProt Swiss-Prot\n"
         "• Total: ~25.000 sekuens protein\n"
@@ -192,61 +158,6 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(text, parse_mode='HTML')
 
-async def compare(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    seq = ' '.join(context.args)
-    if not seq:
-        await update.message.reply_text(
-            "⚠️ Gunakan: `/compare MKTAYIA...`\n"
-            "Contoh: `/compare MKTAYIAQQLQ`",
-            parse_mode='Markdown'
-        )
-        return
-    seq = seq.upper()
-    if not SEQ_PATTERN.match(seq):
-        await update.message.reply_text(
-            "❌ Sekuens tidak valid. Hanya huruf A-Z, panjang 4-1000.",
-            parse_mode='Markdown'
-        )
-        return
-    await update.message.reply_text("⏳ Membandingkan semua model... (ESM-2 mungkin perlu ~30 detik)")
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            r = await client.post(f"{API_URL}/predict", json={"sequence": seq, "model": "all"})
-            if r.status_code != 200:
-                await update.message.reply_text(f"❌ Error API: {r.json().get('detail', 'Unknown error')}")
-                return
-            result = r.json()
-        text = build_prediction_text(result, "all")
-        if len(text) > 4000:
-            parts = [text[i:i+4000] for i in range(0, len(text), 4000)]
-            for part in parts:
-                await update.message.reply_text(part, parse_mode='Markdown')
-        else:
-            await update.message.reply_text(text, parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"❌ Gagal menghubungi API: {e}")
-
-async def set_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text(
-            f"Model saat ini: `{MODEL_DEFAULT}`\n"
-            "Ganti dengan: `/model cnn`, `/model lstm`, atau `/model esm2`",
-            parse_mode='Markdown'
-        )
-        return
-    model = context.args[0].lower()
-    if model not in ("cnn", "lstm", "esm2"):
-        await update.message.reply_text(
-            "❌ Model tidak dikenal. Pilih: `cnn`, `lstm`, atau `esm2`",
-            parse_mode='Markdown'
-        )
-        return
-    context.user_data['model'] = model
-    await update.message.reply_text(
-        f"✅ Model default diubah ke: *{MODEL_NAMES[model]}*",
-        parse_mode='Markdown'
-    )
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not SEQ_PATTERN.match(text):
@@ -258,12 +169,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     seq = text.upper()
-    model = context.user_data.get('model', MODEL_DEFAULT)
-    model_label = MODEL_NAMES.get(model, model)
-    await update.message.reply_text(f"⏳ Memprediksi dengan *{model_label}*...", parse_mode='Markdown')
+    await update.message.reply_text("⏳ Memprediksi dengan *LSTM v5*...", parse_mode='Markdown')
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            r = await client.post(f"{API_URL}/predict", json={"sequence": seq, "model": model})
+            r = await client.post(f"{API_URL}/predict", json={"sequence": seq, "model": "lstm"})
             if r.status_code != 200:
                 await update.message.reply_text(f"❌ Error API: {r.json().get('detail', 'Unknown error')}")
                 return
@@ -289,8 +198,6 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("about", about))
-    app.add_handler(CommandHandler("compare", compare))
-    app.add_handler(CommandHandler("model", set_model))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     logger.info("Bot started polling...")

@@ -94,5 +94,4 @@ Kembali ke 80:10:10 (train 20,073) untuk mengembalikan data training yang hilang
 - Data augmentation konservatif (mutasi 1 asam amino per sekuens dari kelompok homolog)
 
 ### Prioritas 3: Eksperimental
-- Frozen ESM-2 embeddings sebagai input LSTM (+3-8% akurasi potensial)
 - Temporal Convolutional Network (TCN) sebagai alternatif arsitektur

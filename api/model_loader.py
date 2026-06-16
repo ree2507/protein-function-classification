@@ -1,4 +1,3 @@
-import os
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -10,6 +9,7 @@ VOCAB_SIZE = len(aa_to_int)
 MAX_LEN = 1000
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 class ProteinDataset(Dataset):
     def __init__(self, sequences, labels=None, max_len=MAX_LEN):
@@ -28,42 +28,6 @@ class ProteinDataset(Dataset):
         if self.labels is not None:
             return torch.tensor(seq_int, dtype=torch.long), torch.tensor(self.labels[idx], dtype=torch.long)
         return torch.tensor(seq_int, dtype=torch.long)
-
-
-class ProteinMultiScaleCNN(nn.Module):
-    def __init__(self, vocab_size, embed_dim, num_classes):
-        super(ProteinMultiScaleCNN, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
-        self.spatial_dropout = nn.Dropout1d(p=0.3)
-
-        self.branch1 = nn.Sequential(
-            nn.Conv1d(in_channels=embed_dim, out_channels=128, kernel_size=3, padding=1),
-            nn.ReLU(), nn.BatchNorm1d(128))
-        self.branch2 = nn.Sequential(
-            nn.Conv1d(in_channels=embed_dim, out_channels=128, kernel_size=5, padding=2),
-            nn.ReLU(), nn.BatchNorm1d(128))
-        self.branch3 = nn.Sequential(
-            nn.Conv1d(in_channels=embed_dim, out_channels=128, kernel_size=9, padding=4),
-            nn.ReLU(), nn.BatchNorm1d(128))
-
-        self.global_max_pool = nn.AdaptiveMaxPool1d(1)
-        self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
-
-        self.fc = nn.Sequential(
-            nn.Linear(768, 256), nn.ReLU(), nn.Dropout(0.5),
-            nn.Linear(256, num_classes))
-
-    def forward(self, x):
-        x = self.embedding(x)
-        x = x.transpose(1, 2)
-        x = self.spatial_dropout(x)
-        out1, out2, out3 = self.branch1(x), self.branch2(x), self.branch3(x)
-        pooled = torch.cat([
-            self.global_max_pool(out1).squeeze(-1), self.global_avg_pool(out1).squeeze(-1),
-            self.global_max_pool(out2).squeeze(-1), self.global_avg_pool(out2).squeeze(-1),
-            self.global_max_pool(out3).squeeze(-1), self.global_avg_pool(out3).squeeze(-1),
-        ], dim=1)
-        return self.fc(pooled)
 
 
 class ProteinLSTM(nn.Module):
@@ -109,14 +73,6 @@ class ProteinLSTM(nn.Module):
 
 _model_cache = {}
 
-def load_cnn(num_classes=6):
-    if 'cnn' not in _model_cache:
-        model = ProteinMultiScaleCNN(VOCAB_SIZE, 64, num_classes).to(device)
-        model.load_state_dict(torch.load('models/cnn_model.pth', map_location=device, weights_only=True))
-        model.eval()
-        _model_cache['cnn'] = model
-    return _model_cache['cnn']
-
 def load_lstm(num_classes=6):
     if 'lstm' not in _model_cache:
         model = ProteinLSTM(VOCAB_SIZE, 128, 128, 2, num_classes).to(device)
@@ -124,32 +80,3 @@ def load_lstm(num_classes=6):
         model.eval()
         _model_cache['lstm'] = model
     return _model_cache['lstm']
-
-def load_esm2(num_classes=6):
-    if 'esm2' not in _model_cache:
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
-        from peft import PeftModel
-
-        ESM2_MODEL_NAME = "facebook/esm2_t12_35M_UR50D"
-        tokenizer = AutoTokenizer.from_pretrained(ESM2_MODEL_NAME)
-
-        class CustomClassifier(nn.Module):
-            def __init__(self, hidden_size, num_classes):
-                super().__init__()
-                self.fc = nn.Sequential(
-                    nn.Linear(hidden_size, 256), nn.ReLU(), nn.Dropout(0.3),
-                    nn.Linear(256, num_classes))
-            def forward(self, x):
-                x = x[:, 0, :]
-                return self.fc(x)
-
-        base_model = AutoModelForSequenceClassification.from_pretrained(
-            ESM2_MODEL_NAME, num_labels=num_classes)
-        hidden_size = base_model.config.hidden_size
-        base_model.classifier = CustomClassifier(hidden_size, num_classes)
-
-        model = PeftModel.from_pretrained(base_model, 'models/esm2_model_best')
-        model = model.to(device)
-        model.eval()
-        _model_cache['esm2'] = (model, tokenizer)
-    return _model_cache['esm2']

@@ -6,10 +6,7 @@ matplotlib>=3.5
 seaborn>=0.12
 numpy>=1.23
 
-# Deep Learning & Transformers
-transformers>=4.41.0,<4.45.0
-peft>=0.12.0,<0.13.0  # LoRA fine-tuning (pinned for transformers 4.41.x compat)
-accelerate>=1.0.0     # Required by PEFT
+# Deep Learning
 # Note: PyTorch with CUDA should be installed with a specific index-url on Windows.
 # Run a separate pip install command for it:
 #   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124

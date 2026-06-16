@@ -2,16 +2,14 @@
 
 ## Latar Belakang
 
-Saat ini komparasi memiliki gap: **CNN** (konvolusi/pola lokal), **LSTM** (recurrence/sekuensial), **ESM-2** (transfer learning/pretrained). Transformer from-scratch mengisolasi **self-attention murni tanpa pretraining** — menjawab apakah arsitektur transformer saja cukup efektif untuk klasifikasi protein, atau memang butuh pretraining skala besar seperti ESM-2.
+Dokumen ini adalah proposal untuk eksperimen Transformer from-scratch sebagai pengembangan lanjutan dari model LSTM yang sudah ada. Transformer from-scratch mengisolasi **self-attention murni tanpa pretraining**.
 
 ## Perbandingan Parameter & Kompleksitas
 
 | Model | Total Params | Waktu/Epoch | VRAM | Akurasi |
 |-------|:-----------:|:-----------:|:----:|:-------:|
-| CNN | ~340K | ~24s | Rendah | 82.76% |
 | LSTM | ~827K | ~49s | Rendah | 86.85% |
 | **Transformer (est.)** | **~2–5M** | **?** | **?** | **?** |
-| ESM-2 | 34.3M (124.7K trainable) | ~1040s (T4) | 15.6GB | 93.09% |
 
 ## Arsitektur v1 (Proposal)
 
@@ -42,7 +40,7 @@ Saat ini komparasi memiliki gap: **CNN** (konvolusi/pola lokal), **LSTM** (recur
 | Classifier Head | 512×256 + 256×6 | 132,608 |
 | **Total** | | **~4.49M** |
 
-Antara LSTM (~827K) dan ESM-2 (34.3M). Posisi yang baik untuk menguji trade-off parameter vs performa.
+LSTMsudah mencapai 86.85% dengan ~827K params; Transformer diharapkan menguji apakah self-attention memberikan peningkatan signifikan.
 
 ### Estimasi VRAM (RTX 2050 4GB)
 
@@ -89,14 +87,10 @@ Komponen terbesar: **attention score matrix** — `batch × heads × seq² × la
 
 ## Perbandingan yang Diharapkan
 
-Setelah model selesai, empat model bisa dibandingkan dalam spektrum:
+Setelah model selesai, dua model bisa dibandingkan:
 
 ```
-Kompleksitas Rendah ←─────────────────────────────→ Kompleksitas Tinggi
-      CNN           LSTM     Transformer (scratch)      ESM-2
-   ~340K params    ~827K         ~4.5M              34.3M (124.7K trainable)
-   ~24s/epoch      ~49s           ?                 ~1040s (T4)
-   Pola lokal      Sekuensial    Self-attention     Transfer learning
+      LSTM          Transformer (scratch)
+    ~827K              ~4.5M
+   Sekuensial         Self-attention
 ```
-
-Ini mengisi celah yang ada: arsitektur transformer murni tanpa pretraining di antara LSTM dan ESM-2 dalam spektrum parameter dan kompleksitas.
